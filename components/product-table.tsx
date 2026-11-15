@@ -1,0 +1,155 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { WarnBadge } from './metrics-view'
+import { decimal, integer, percent, rupiah } from '@/lib/format'
+import { isWarning, NPM_THRESHOLD, warningReason, type ProductTotals, type Totals } from '@/lib/metrics'
+import { cn } from '@/lib/cn'
+
+type Key = 'product' | 'gmv' | 'spend' | 'cpr' | 'roas' | 'profit' | 'poas' | 'npm'
+
+const COLS: Array<{ key: Key; label: string; num: boolean }> = [
+  { key: 'product', label: 'Produk', num: false },
+  { key: 'gmv', label: 'GMV', num: true },
+  { key: 'spend', label: 'Spend Iklan', num: true },
+  { key: 'cpr', label: 'CPR', num: true },
+  { key: 'roas', label: 'ROAS', num: true },
+  { key: 'profit', label: 'Profit*', num: true },
+  { key: 'poas', label: 'POAS', num: true },
+  { key: 'npm', label: 'NPM', num: true },
+]
+
+function cell(key: Exclude<Key, 'product'>, t: Totals): string {
+  switch (key) {
+    case 'gmv':
+      return rupiah(t.gmv)
+    case 'spend':
+      return rupiah(t.spend)
+    case 'cpr':
+      return rupiah(t.cpr)
+    case 'roas':
+      return decimal(t.roas)
+    case 'profit':
+      return rupiah(t.profit)
+    case 'poas':
+      return decimal(t.poas)
+    case 'npm':
+      return percent(t.npm)
+  }
+}
+
+function tone(key: Key, t: Totals): string {
+  if (key === 'profit' && t.profit < 0) return 'text-destructive'
+  if (key === 'poas' && t.poas !== null && t.poas < 0) return 'text-destructive'
+  if (key === 'npm' && (t.profit < 0 || (t.npm !== null && t.npm < NPM_THRESHOLD))) return 'text-destructive'
+  return ''
+}
+
+export function ProductTable({ items, summary }: { items: ProductTotals[]; summary: Totals }) {
+  const [sort, setSort] = useState<{ key: Key; dir: 'asc' | 'desc' }>({ key: 'gmv', dir: 'desc' })
+
+  const sorted = useMemo(() => {
+    const arr = [...items]
+    const { key, dir } = sort
+    const m = dir === 'asc' ? 1 : -1
+    arr.sort((a, b) => {
+      if (key === 'product') return a.product.localeCompare(b.product, 'id') * m
+      const va = a[key]
+      const vb = b[key]
+      if (va === null && vb === null) return 0
+      if (va === null) return 1 // kosong selalu di bawah
+      if (vb === null) return -1
+      return (va - vb) * m
+    })
+    return arr
+  }, [items, sort])
+
+  const toggle = (key: Key) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: key === 'product' ? 'asc' : 'desc' }))
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-sm">
+          <thead>
+            <tr className="border-b border-border bg-muted/60">
+              {COLS.map((c) => {
+                const active = sort.key === c.key
+                const Icon = !active ? ArrowUpDown : sort.dir === 'asc' ? ArrowUp : ArrowDown
+                return (
+                  <th
+                    key={c.key}
+                    aria-sort={active ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    className={cn(
+                      'whitespace-nowrap px-3 py-2.5 text-xs font-semibold text-muted-foreground',
+                      c.num ? 'text-right' : 'sticky-col bg-muted text-left',
+                    )}
+                  >
+                    <button
+                      onClick={() => toggle(c.key)}
+                      className={cn('inline-flex items-center gap-1 hover:text-foreground', active && 'text-foreground', c.num && 'flex-row-reverse')}
+                    >
+                      {c.label}
+                      <Icon className={cn('h-3.5 w-3.5', !active && 'opacity-40')} />
+                    </button>
+                  </th>
+                )
+              })}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.length === 0 && (
+              <tr>
+                <td colSpan={COLS.length} className="px-3 py-10 text-center text-muted-foreground">
+                  Belum ada data di periode ini.
+                </td>
+              </tr>
+            )}
+            {sorted.map((p) => {
+              const warn = p.spend + p.gmv > 0 && isWarning(p)
+              return (
+                <tr key={p.product} className={cn('border-b border-border/70 last:border-0', warn && 'bg-destructive/5')}>
+                  <td
+                    className="sticky-col max-w-[180px] bg-card px-3 py-2.5 align-top sm:max-w-[260px]"
+                    style={warn ? { background: 'color-mix(in srgb, var(--color-destructive) 5%, var(--color-card))' } : undefined}
+                  >
+                    <p className="truncate font-medium text-foreground" title={p.product}>
+                      {p.product}
+                    </p>
+                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] text-muted-foreground">{integer(p.orders)} order</span>
+                      {warn && (
+                        <WarnBadge size="sm">{warningReason(p)}</WarnBadge>
+                      )}
+                    </div>
+                  </td>
+                  {COLS.slice(1).map((c) => (
+                    <td key={c.key} className={cn('whitespace-nowrap px-3 py-2.5 text-right tabular-nums', tone(c.key, p))}>
+                      {cell(c.key as Exclude<Key, 'product'>, p)}
+                    </td>
+                  ))}
+                </tr>
+              )
+            })}
+          </tbody>
+          {sorted.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-border bg-muted/60 font-bold">
+                <td className="sticky-col bg-muted px-3 py-3 text-foreground">
+                  Summary
+                  <span className="ml-1 text-[11px] font-medium text-muted-foreground">· {integer(summary.orders)} order</span>
+                </td>
+                {COLS.slice(1).map((c) => (
+                  <td key={c.key} className={cn('whitespace-nowrap px-3 py-3 text-right tabular-nums text-foreground', tone(c.key, summary))}>
+                    {cell(c.key as Exclude<Key, 'product'>, summary)}
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  )
+}
