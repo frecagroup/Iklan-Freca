@@ -5,19 +5,15 @@ import { BrandTabs } from '@/components/brand-tabs'
 import { DailyTable, MoneyChart, NpmChart, type DayPoint } from '@/components/trend-charts'
 import { ErrorBox, ProfitNote } from '@/components/metrics-view'
 import { useAdsRows, useDashboard } from '@/lib/data'
-import { addDays, eachDay, tanggal, todayWIB } from '@/lib/format'
+import { addDays, eachDay, tanggal } from '@/lib/format'
 import { sumRows, type AdsRow, type Brand } from '@/lib/metrics'
 
 export default function TrenPage() {
-  const { tick } = useDashboard()
+  const { today } = useDashboard()
   const [brand, setBrand] = useState<Brand | null>(null)
 
   // 30 hari terakhir (WIB), termasuk hari ini yang masih berjalan
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const range = useMemo(() => {
-    const t = todayWIB()
-    return { from: addDays(t, -29), to: t }
-  }, [tick])
+  const range = useMemo(() => ({ from: addDays(today, -29), to: today }), [today])
   const { rows, error } = useAdsRows(range, brand)
 
   const series = useMemo<DayPoint[] | null>(() => {

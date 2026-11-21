@@ -4,17 +4,20 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Store, TrendingUp, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, Store, TrendingUp, LogOut, ChevronLeft, ChevronRight, ChevronDown, GitCompare, Settings } from 'lucide-react'
 import { getSupabase } from '@/lib/supabase/client'
 import { BRANDS, brandSlug } from '@/lib/metrics'
 import { ThemeToggle } from './theme'
 import { UpdateStatus, RefreshButton } from './update-status'
 import { cn } from '@/lib/cn'
 
+// short = label di tab bawah HP
 const nav = [
-  { href: '/', label: 'Ringkasan', icon: LayoutDashboard, match: (p: string) => p === '/' },
-  { href: `/brand/${brandSlug(BRANDS[0])}`, label: 'Detail Brand', icon: Store, match: (p: string) => p.startsWith('/brand') },
-  { href: '/tren', label: 'Tren', icon: TrendingUp, match: (p: string) => p.startsWith('/tren') },
+  { href: '/', label: 'Ringkasan', short: 'Ringkasan', icon: LayoutDashboard, match: (p: string) => p === '/' },
+  { href: `/brand/${brandSlug(BRANDS[0])}`, label: 'Detail Brand', short: 'Brand', icon: Store, match: (p: string) => p.startsWith('/brand') },
+  { href: '/tren', label: 'Tren', short: 'Tren', icon: TrendingUp, match: (p: string) => p.startsWith('/tren') },
+  { href: '/komparasi', label: 'Komparasi', short: 'Banding', icon: GitCompare, match: (p: string) => p.startsWith('/komparasi') },
+  { href: '/pengaturan', label: 'Pengaturan', short: 'Setting', icon: Settings, match: (p: string) => p.startsWith('/pengaturan') },
 ]
 
 function initialsOf(email?: string | null): string {
@@ -22,29 +25,8 @@ function initialsOf(email?: string | null): string {
   return email.slice(0, 2).toUpperCase()
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [collapsed, setCollapsed] = useState(false)
-  const [userMenu, setUserMenu] = useState(false)
-  const [email, setEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    getSupabase()
-      .auth.getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null))
-  }, [])
-
-  const out = async () => {
-    setUserMenu(false)
-    await getSupabase().auth.signOut()
-    router.replace('/login')
-    router.refresh()
-  }
-
-  const current = nav.find((n) => n.match(pathname)) ?? nav[0]
-
-  const Sidebar = ({ mini = false }: { mini?: boolean }) => (
+function Sidebar({ mini = false, pathname }: { mini?: boolean; pathname: string }) {
+  return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className={cn('flex h-20 flex-shrink-0 items-center border-b border-sidebar-border', mini ? 'justify-center px-2' : 'gap-3 px-5')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -106,11 +88,34 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
     </div>
   )
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [collapsed, setCollapsed] = useState(false)
+  const [userMenu, setUserMenu] = useState(false)
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSupabase()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null))
+  }, [])
+
+  const out = async () => {
+    setUserMenu(false)
+    await getSupabase().auth.signOut()
+    router.replace('/login')
+    router.refresh()
+  }
+
+  const current = nav.find((n) => n.match(pathname)) ?? nav[0]
 
   return (
     <div className="flex h-dvh overflow-hidden bg-muted/40">
       <aside className={cn('relative hidden flex-shrink-0 transition-all duration-300 md:block', collapsed ? 'w-20' : 'w-64')}>
-        <Sidebar mini={collapsed} />
+        <Sidebar mini={collapsed} pathname={pathname} />
         <button
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
@@ -188,12 +193,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  'flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-xs font-medium transition-colors',
+                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                   active ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon className="h-5 w-5" />
-                {n.label === 'Detail Brand' ? 'Brand' : n.label}
+                {n.short}
               </Link>
             )
           })}

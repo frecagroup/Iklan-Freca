@@ -88,3 +88,23 @@ export function jamWIB(ts: string | Date): string {
     .format(d)
     .replace('.', ':')
 }
+
+/** Label rentang ringkas: "12–13 Nov", "12 Nov", "28 Okt – 3 Nov", tahun ditampilkan bila beda dengan tahun ini */
+export function rangeLabel(from: string, to: string, thisYear: string = todayWIB().slice(0, 4)): string {
+  const [y1, m1, d1] = from.split('-').map(Number)
+  const [y2, m2, d2] = to.split('-').map(Number)
+  const yr = (y: number) => (String(y) !== thisYear ? ` ${y}` : '')
+  if (from === to) return `${d1} ${BULAN[m1 - 1]}${yr(y1)}`
+  if (y1 === y2 && m1 === m2) return `${d1}–${d2} ${BULAN[m1 - 1]}${yr(y1)}`
+  if (y1 === y2) return `${d1} ${BULAN[m1 - 1]} – ${d2} ${BULAN[m2 - 1]}${yr(y1)}`
+  return `${d1} ${BULAN[m1 - 1]} ${y1} – ${d2} ${BULAN[m2 - 1]} ${y2}`
+}
+
+/** Jumlah hari inklusif */
+export function dayCount(from: string, to: string): number {
+  const ms = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((ms(to) - ms(from)) / 86_400_000) + 1
+}
