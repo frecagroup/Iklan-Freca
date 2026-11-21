@@ -14,6 +14,7 @@ import {
 } from 'react'
 import { getSupabase } from './supabase/client'
 import { addDays, todayWIB } from './format'
+import { fetchIsEditor } from './settings'
 import type { AdsRow } from './metrics'
 
 // ---------------- Periode ----------------
@@ -114,6 +115,10 @@ type Ctx = {
   track: <T>(p: Promise<T>) => Promise<T>
   sync: SyncStatus | null
   lastFetched: Date | null
+  /** boleh membuka Pengaturan (ads.is_settings_editor). null = belum diketahui */
+  isEditor: boolean | null
+  /** pesan error terakhir saat cek status editor (dianggap bukan editor) */
+  editorError: string | null
 }
 
 const DashCtx = createContext<Ctx | null>(null)
@@ -126,6 +131,11 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const [lastFetched, setLastFetched] = useState<Date | null>(null)
   const [today, setToday] = useState(todayWIB)
   const pending = useRef(0)
+  const [isEditor, setIsEditor] = useState<boolean | null>(null)
+  const [editorError, setEditorError] = useState<string | null>(null)
+  // naik saat user login/logout berganti → cek ulang status editor
+  const [authKey, setAuthKey] = useState(0)
+  const userId = useRef<string | null | undefined>(undefined)
 
   const setPreset = useCallback((p: Preset) => writePeriod({ ...readPeriod(), preset: p }), [])
   const setCustom = useCallback((r: Range) => writePeriod({ preset: 'custom', custom: r }), [])
@@ -184,6 +194,40 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     }
   }, [tick, track])
 
+  // ganti user (login/logout di tab lain, token berganti user) → status editor direset
+  useEffect(() => {
+    const { data } = getSupabase().auth.onAuthStateChange((_event, session) => {
+      const id = session?.user?.id ?? null
+      if (userId.current !== undefined && userId.current !== id) {
+        setIsEditor(null)
+        setEditorError(null)
+        setAuthKey((k) => k + 1)
+      }
+      userId.current = id
+    })
+    return () => data.subscription.unsubscribe()
+  }, [])
+
+  // status editor: diambil sekali per sesi, diulang saat refresh() / user berganti.
+  // Saat refresh, nilai lama tetap dipakai sampai jawaban baru datang (menu tidak berkedip).
+  useEffect(() => {
+    let alive = true
+    track(fetchIsEditor())
+      .then((v) => {
+        if (!alive) return
+        setIsEditor(v)
+        setEditorError(null)
+      })
+      .catch((e: unknown) => {
+        if (!alive) return
+        setIsEditor(false) // gagal cek = bukan editor
+        setEditorError(errorMessage(e))
+      })
+    return () => {
+      alive = false
+    }
+  }, [tick, authKey, track])
+
   const range = useMemo(() => rangeOf(period.preset, period.custom, today), [period, today])
 
   return (
@@ -201,6 +245,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
         track,
         sync,
         lastFetched,
+        isEditor,
+        editorError,
       }}
     >
       {children}

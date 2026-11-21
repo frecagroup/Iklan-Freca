@@ -10,6 +10,7 @@ import { BRANDS, brandSlug } from '@/lib/metrics'
 import { ThemeToggle } from './theme'
 import { UpdateStatus, RefreshButton } from './update-status'
 import { cn } from '@/lib/cn'
+import { useDashboard } from '@/lib/data'
 
 // short = label di tab bawah HP
 const nav = [
@@ -17,15 +18,20 @@ const nav = [
   { href: `/brand/${brandSlug(BRANDS[0])}`, label: 'Detail Brand', short: 'Brand', icon: Store, match: (p: string) => p.startsWith('/brand') },
   { href: '/tren', label: 'Tren', short: 'Tren', icon: TrendingUp, match: (p: string) => p.startsWith('/tren') },
   { href: '/komparasi', label: 'Komparasi', short: 'Banding', icon: GitCompare, match: (p: string) => p.startsWith('/komparasi') },
-  { href: '/pengaturan', label: 'Pengaturan', short: 'Setting', icon: Settings, match: (p: string) => p.startsWith('/pengaturan') },
+  // editorOnly: hanya tampil bila ads.is_settings_editor() = true
+  { href: '/pengaturan', label: 'Pengaturan', short: 'Setting', icon: Settings, match: (p: string) => p.startsWith('/pengaturan'), editorOnly: true },
 ]
+type NavItem = (typeof nav)[number] & { editorOnly?: boolean }
+
+/** Menu yang boleh dilihat. Selama status editor belum diketahui (null), menu editor disembunyikan supaya tidak berkedip. */
+const visibleNav = (isEditor: boolean | null): NavItem[] => (nav as NavItem[]).filter((n) => !n.editorOnly || isEditor === true)
 
 function initialsOf(email?: string | null): string {
   if (!email) return 'F'
   return email.slice(0, 2).toUpperCase()
 }
 
-function Sidebar({ mini = false, pathname }: { mini?: boolean; pathname: string }) {
+function Sidebar({ mini = false, pathname, items }: { mini?: boolean; pathname: string; items: NavItem[] }) {
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className={cn('flex h-20 flex-shrink-0 items-center border-b border-sidebar-border', mini ? 'justify-center px-2' : 'gap-3 px-5')}>
@@ -40,7 +46,7 @@ function Sidebar({ mini = false, pathname }: { mini?: boolean; pathname: string 
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {nav.map((n) => {
+        {items.map((n) => {
           const Icon = n.icon
           const active = n.match(pathname)
           return (
@@ -110,12 +116,14 @@ export function AppShell({ children }: { children: ReactNode }) {
     router.refresh()
   }
 
+  const { isEditor } = useDashboard()
+  const items = visibleNav(isEditor)
   const current = nav.find((n) => n.match(pathname)) ?? nav[0]
 
   return (
     <div className="flex h-dvh overflow-hidden bg-muted/40">
       <aside className={cn('relative hidden flex-shrink-0 transition-all duration-300 md:block', collapsed ? 'w-20' : 'w-64')}>
-        <Sidebar mini={collapsed} pathname={pathname} />
+        <Sidebar mini={collapsed} pathname={pathname} items={items} />
         <button
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
@@ -196,7 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Tab bawah HP (gaya UserLayout Absensi) */}
         <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-border bg-card/95 px-2 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-          {nav.map((n) => {
+          {items.map((n) => {
             const Icon = n.icon
             const active = n.match(pathname)
             return (

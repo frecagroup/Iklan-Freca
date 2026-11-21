@@ -14,12 +14,10 @@ import { cn } from '@/lib/cn'
 /** Drawer riwayat versi HPP satu SKU. Render hanya saat terbuka. */
 export function HppHistoryDrawer({
   row,
-  canEdit,
   onClose,
   onChanged,
 }: {
   row: HppRow
-  canEdit: boolean
   onClose: () => void
   onChanged: () => void
 }) {
@@ -104,7 +102,7 @@ export function HppHistoryDrawer({
                       .filter(Boolean)
                       .join(' · ')}
                   </p>
-                  {future && canEdit && (
+                  {future && (
                     <Button
                       size="sm"
                       variant="outline"

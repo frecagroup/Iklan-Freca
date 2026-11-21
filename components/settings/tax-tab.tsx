@@ -80,7 +80,8 @@ function TaxModal({ platform, current, onClose, onSaved }: { platform: Platform;
   )
 }
 
-export function TaxTab({ canEdit }: { canEdit: boolean }) {
+/** Hanya dirender untuk editor (halaman Pengaturan sudah menyaring non-editor). */
+export function TaxTab() {
   const { today } = useDashboard()
   const toast = useToast()
   const [ver, setVer] = useState(0)
@@ -133,11 +134,9 @@ export function TaxTab({ canEdit }: { canEdit: boolean }) {
                     </div>
                   )}
                 </div>
-                {canEdit && (
-                  <Button size="sm" variant="outline" onClick={() => setEditing(p)} disabled={!data}>
-                    <Pencil className="h-3.5 w-3.5" /> Ubah
-                  </Button>
-                )}
+                <Button size="sm" variant="outline" onClick={() => setEditing(p)} disabled={!data}>
+                  <Pencil className="h-3.5 w-3.5" /> Ubah
+                </Button>
               </div>
             </div>
           )
@@ -193,7 +192,7 @@ export function TaxTab({ canEdit }: { canEdit: boolean }) {
                           .join(' · ') || '—'}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2 text-right">
-                        {future && canEdit && (
+                        {future && (
                           <Button
                             size="sm"
                             variant="ghost"

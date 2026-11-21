@@ -18,7 +18,8 @@ import { cn } from '@/lib/cn'
 
 const ddmm = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`
 
-export function HppTab({ canEdit }: { canEdit: boolean }) {
+/** Hanya dirender untuk editor (halaman Pengaturan sudah menyaring non-editor). */
+export function HppTab() {
   const toast = useToast()
   const [ver, setVer] = useState(0)
   const reload = () => setVer((v) => v + 1)
@@ -96,16 +97,12 @@ export function HppTab({ canEdit }: { canEdit: boolean }) {
               </>
             )}
           </div>
-          {canEdit && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} disabled={!data}>
-                <Upload className="h-4 w-4" /> Import
-              </Button>
-              <Button size="sm" onClick={() => setEdit({ row: null })}>
-                <Plus className="h-4 w-4" /> Tambah SKU
-              </Button>
-            </>
-          )}
+          <Button variant="outline" size="sm" onClick={() => setImportOpen(true)} disabled={!data}>
+            <Upload className="h-4 w-4" /> Import
+          </Button>
+          <Button size="sm" onClick={() => setEdit({ row: null })}>
+            <Plus className="h-4 w-4" /> Tambah SKU
+          </Button>
         </div>
       </div>
 
@@ -192,11 +189,9 @@ export function HppTab({ canEdit }: { canEdit: boolean }) {
                           >
                             <History className="h-4 w-4" />
                           </button>
-                          {canEdit && (
-                            <Button size="sm" variant="outline" onClick={() => setEdit({ row: r })}>
-                              <Pencil className="h-3.5 w-3.5" /> Ubah
-                            </Button>
-                          )}
+                          <Button size="sm" variant="outline" onClick={() => setEdit({ row: r })}>
+                            <Pencil className="h-3.5 w-3.5" /> Ubah
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -209,7 +204,7 @@ export function HppTab({ canEdit }: { canEdit: boolean }) {
       )}
 
       {edit && <HppEditModal row={edit.row} onClose={() => setEdit(null)} onSaved={reload} />}
-      {history && <HppHistoryDrawer row={history} canEdit={canEdit} onClose={() => setHistory(null)} onChanged={reload} />}
+      {history && <HppHistoryDrawer row={history} onClose={() => setHistory(null)} onChanged={reload} />}
       {importOpen && <HppImportModal current={data ?? []} onClose={() => setImportOpen(false)} onDone={reload} />}
     </div>
   )
