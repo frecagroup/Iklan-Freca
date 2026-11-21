@@ -47,6 +47,8 @@ export function rangeOf(preset: Preset, custom: Range, today: string = todayWIB(
 }
 
 export const REFRESH_MS = 5 * 60 * 1000
+/** jeda retry cek status editor pertama yang gagal */
+const EDITOR_RETRY_MS = 3000
 
 export type SyncStatus = { last_run: string | null; status: string | null; note: string | null }
 
@@ -117,7 +119,7 @@ type Ctx = {
   lastFetched: Date | null
   /** boleh membuka Pengaturan (ads.is_settings_editor). null = belum diketahui */
   isEditor: boolean | null
-  /** pesan error terakhir saat cek status editor (dianggap bukan editor) */
+  /** pesan error cek status editor terakhir (null bila cek terakhir berhasil). Tidak mengubah isEditor yang sudah diketahui. */
   editorError: string | null
 }
 
@@ -136,6 +138,8 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   // naik saat user login/logout berganti → cek ulang status editor
   const [authKey, setAuthKey] = useState(0)
   const userId = useRef<string | null | undefined>(undefined)
+  // nilai editor terakhir yang sudah diputuskan (null = belum pernah) — dibaca di callback async
+  const editorKnown = useRef<boolean | null>(null)
 
   const setPreset = useCallback((p: Preset) => writePeriod({ ...readPeriod(), preset: p }), [])
   const setCustom = useCallback((r: Range) => writePeriod({ preset: 'custom', custom: r }), [])
@@ -199,6 +203,7 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     const { data } = getSupabase().auth.onAuthStateChange((_event, session) => {
       const id = session?.user?.id ?? null
       if (userId.current !== undefined && userId.current !== id) {
+        editorKnown.current = null
         setIsEditor(null)
         setEditorError(null)
         setAuthKey((k) => k + 1)
@@ -208,23 +213,43 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe()
   }, [])
 
-  // status editor: diambil sekali per sesi, diulang saat refresh() / user berganti.
-  // Saat refresh, nilai lama tetap dipakai sampai jawaban baru datang (menu tidak berkedip).
+  // Status editor: diambil sekali per sesi, diulang saat refresh() / user berganti.
+  // Aturan:
+  // - RPC berhasil → isEditor = hasilnya (satu-satunya jalan true → false selain ganti user/logout).
+  // - Cek ulang gagal (jaringan/timeout) saat status sudah diketahui → isEditor TIDAK diubah;
+  //   hanya editorError + console. Tanpa redirect, tanpa toast.
+  // - Cek pertama gagal → coba lagi 1x setelah 3 detik; bila tetap gagal → dianggap bukan editor.
   useEffect(() => {
     let alive = true
-    track(fetchIsEditor())
-      .then((v) => {
-        if (!alive) return
-        setIsEditor(v)
-        setEditorError(null)
-      })
-      .catch((e: unknown) => {
-        if (!alive) return
-        setIsEditor(false) // gagal cek = bukan editor
-        setEditorError(errorMessage(e))
-      })
+    let retryTimer: ReturnType<typeof setTimeout> | undefined
+
+    const attempt = (isRetry: boolean) => {
+      track(fetchIsEditor())
+        .then((v) => {
+          if (!alive) return
+          editorKnown.current = v
+          setIsEditor(v)
+          setEditorError(null)
+        })
+        .catch((e: unknown) => {
+          if (!alive) return
+          const msg = errorMessage(e)
+          console.warn('[Freca Ads] cek status editor gagal:', msg)
+          setEditorError(msg)
+          if (editorKnown.current !== null) return // pertahankan nilai terakhir yang berhasil
+          if (!isRetry) {
+            retryTimer = setTimeout(() => alive && attempt(true), EDITOR_RETRY_MS)
+            return
+          }
+          editorKnown.current = false
+          setIsEditor(false) // cek pertama tetap gagal → bukan editor
+        })
+    }
+    attempt(false)
+
     return () => {
       alive = false
+      if (retryTimer) clearTimeout(retryTimer)
     }
   }, [tick, authKey, track])
 
