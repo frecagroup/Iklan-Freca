@@ -65,14 +65,13 @@ function RangePicker({
 }) {
   return (
     <div className="min-w-0">
-      <div className="mb-1.5 flex items-baseline justify-between gap-2">
-        <span className="text-sm font-medium text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground">{dayCount(value.from, value.to)} hari</span>
-      </div>
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <DateRangePicker value={value} onChange={(r) => onChange(r)} max={today} className="min-w-0 flex-1" buttonClassName="py-2" title={label} />
+      <div className="mb-1.5 flex min-h-7 items-center justify-between gap-2">
+        <span className="text-sm font-medium text-foreground">
+          {label} <span className="text-xs font-normal text-muted-foreground">· {dayCount(value.from, value.to)} hari</span>
+        </span>
         {extra}
       </div>
+      <DateRangePicker value={value} onChange={(r) => onChange(r)} max={today} buttonClassName="py-2" title={label} />
     </div>
   )
 }
@@ -192,7 +191,7 @@ function KomparasiInner() {
                         const len = dayCount(pB.from, pB.to)
                         update({ a: rangeParam({ from: addDays(pB.from, -len), to: addDays(pB.from, -1) }) })
                       }}
-                      className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-muted px-3 py-2 text-xs font-medium text-primary hover:bg-muted/70"
+                      className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-muted px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted/70"
                       title="Periode dengan panjang sama tepat sebelum Periode B"
                     >
                       <History className="h-3 w-3" /> Sebelum B

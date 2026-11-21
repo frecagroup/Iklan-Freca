@@ -4,7 +4,7 @@
 // Klik pertama = tanggal awal, klik kedua = tanggal akhir (otomatis ditukar bila lebih awal,
 // klik tanggal yang sama dua kali = satu hari). Desktop: 2 bulan berdampingan; HP: 1 bulan (bottom sheet).
 // Nilai selalu 'YYYY-MM-DD' (WIB).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { CalendarDays, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { addDays, rangeLabelFull, todayWIB } from '@/lib/format'
@@ -141,9 +141,27 @@ function Month({
   )
 }
 
-type Pos = { mobile: boolean; top: number; bottom: number; up: boolean; left: number | null; right: number | null }
-const POPUP_W = 720 // perkiraan lebar popup desktop: preset + 2 bulan
-const POPUP_H = 400 // perkiraan tinggi popup desktop
+// sheet = panel dari bawah (HP); drop = dropdown di bawah/atas tombol
+type Layout = { mobile: boolean; months: 1 | 2 }
+
+/** Lebar layar yang benar-benar terlihat (aman untuk HP lipat, zoom, & ukuran font besar) */
+function viewportSize() {
+  const vv = window.visualViewport
+  const w = Math.min(window.innerWidth, document.documentElement.clientWidth || window.innerWidth, vv?.width ?? Infinity)
+  const h = Math.min(window.innerHeight, vv?.height ?? Infinity)
+  return { w, h }
+}
+
+/** Pilih tata letak dari ruang yang tersedia (ukuran dalam rem → ikut skala font perangkat) */
+function chooseLayout(): Layout {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  const { w } = viewportSize()
+  // preset 8rem + bulan 16.5rem + padding/gap ±1.5rem, sisakan margin 16px
+  const one = (8 + 16.5 + 1.75) * rem + 16
+  const two = (8 + 16.5 * 2 + 1.5 + 1.75) * rem + 16
+  if (w < 640 || w < one) return { mobile: true, months: 1 }
+  return { mobile: false, months: w >= two ? 2 : 1 }
+}
 
 export function DateRangePicker({
   value,
@@ -175,33 +193,39 @@ export function DateRangePicker({
   const maxDate = max ?? today
   const btnRef = useRef<HTMLButtonElement>(null)
   const [open, setOpen] = useState(false)
-  const [pos, setPos] = useState<Pos>({ mobile: true, top: 0, bottom: 0, up: false, left: 0, right: null })
+  const [layout, setLayout] = useState<Layout>({ mobile: true, months: 1 })
+  const popRef = useRef<HTMLDivElement>(null)
   const [anchor, setAnchor] = useState<string | null>(null)
   const [hover, setHover] = useState<string | null>(null)
   // bulan paling kanan yang tampil (desktop: bulan ini & sebelumnya)
   const [view, setView] = useState<YM>(() => ymOf(value.to))
 
-  const place = () => {
-    const el = btnRef.current
-    if (!el) return
-    const mobile = window.matchMedia('(max-width: 639px)').matches
-    const r = el.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.innerHeight
-    // rata kiri dengan tombol; kalau tidak muat, rata kanan dengan tombol
-    const fitsLeft = r.left + POPUP_W <= vw - 8
-    const left = fitsLeft ? r.left : null
-    const right = fitsLeft ? null : Math.max(8, vw - r.right)
-    // tidak muat di bawah tombol → tampilkan di atas
-    const up = r.bottom + 8 + POPUP_H > vh - 8 && r.top - 8 - POPUP_H > 8
-    setPos({ mobile, top: r.bottom + 8, bottom: vh - r.top + 8, up, left, right })
+  /** Posisikan dropdown dari ukuran ASLI popup supaya selalu di dalam layar */
+  const placePopup = () => {
+    const pop = popRef.current
+    const btn = btnRef.current
+    if (!pop || !btn || layout.mobile) return
+    const { w: vw, h: vh } = viewportSize()
+    const r = btn.getBoundingClientRect()
+    pop.style.maxWidth = `${vw - 16}px`
+    pop.style.maxHeight = `${vh - 16}px`
+    const w = pop.offsetWidth
+    const h = pop.offsetHeight
+    // rata kiri dengan tombol; kalau tidak muat, rata kanan; selalu dijepit 8px dari tepi layar
+    let left = r.left + w <= vw - 8 ? r.left : r.right - w
+    left = Math.max(8, Math.min(left, vw - w - 8))
+    // di bawah tombol; kalau tidak muat, di atas; kalau tetap tidak muat, sejajarkan ke tepi bawah layar
+    let top = r.bottom + 8
+    if (top + h > vh - 8) top = r.top - 8 - h >= 8 ? r.top - 8 - h : Math.max(8, vh - h - 8)
+    pop.style.left = `${left}px`
+    pop.style.top = `${top}px`
   }
 
   const openPicker = () => {
     setAnchor(null)
     setHover(null)
     setView(ymOf(value.to))
-    place()
+    setLayout(chooseLayout())
     setOpen(true)
   }
   const close = () => {
@@ -213,7 +237,11 @@ export function DateRangePicker({
   // ikuti posisi tombol saat halaman di-scroll / di-resize; Esc menutup
   useEffect(() => {
     if (!open) return
-    const onMove = () => place()
+    const onMove = () => {
+      const next = chooseLayout()
+      setLayout((cur) => (cur.mobile === next.mobile && cur.months === next.months ? cur : next))
+      placePopup()
+    }
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && close()
     window.addEventListener('resize', onMove)
     window.addEventListener('scroll', onMove, true)
@@ -223,7 +251,13 @@ export function DateRangePicker({
       window.removeEventListener('scroll', onMove, true)
       window.removeEventListener('keydown', onKey)
     }
-  }, [open])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, layout])
+
+  // ukur & posisikan setelah popup tampil (sebelum digambar → tanpa kedip)
+  useLayoutEffect(() => {
+    if (open) placePopup()
+  })
 
   const pick = (d: string) => {
     if (!anchor) {
@@ -256,7 +290,7 @@ export function DateRangePicker({
 
   const maxYM = ymOf(maxDate)
   const canNext = ymKey(view) < ymKey(maxYM)
-  const months = pos.mobile ? [view] : [ymAdd(view, -1), view]
+  const months = layout.months === 1 ? [view] : [ymAdd(view, -1), view]
   const canPrev = !min || ymKey(months[0]) > ymKey(ymOf(min))
   const activePreset = presets.find(([k]) => {
     const p = presetRange(k, today)
@@ -267,25 +301,19 @@ export function DateRangePicker({
 
   const popup = (
     <>
-      <div className={cn('fixed inset-0 z-[55]', pos.mobile ? 'bg-black/50 backdrop-blur-sm' : '')} onClick={close} />
+      <div className={cn('fixed inset-0 z-[55]', layout.mobile ? 'bg-black/50 backdrop-blur-sm' : '')} onClick={close} />
       <div
+        ref={popRef}
         role="dialog"
         aria-label={title}
         className={cn(
-          'z-[56] animate-rise overflow-hidden border border-border bg-card shadow-2xl',
-          pos.mobile ? 'fixed inset-x-0 bottom-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]' : 'fixed rounded-xl',
+          'z-[56] animate-rise overflow-y-auto overscroll-contain border border-border bg-card shadow-2xl',
+          layout.mobile
+            ? 'fixed inset-x-0 bottom-0 max-h-[90dvh] rounded-t-2xl pb-[env(safe-area-inset-bottom)]'
+            : 'fixed left-2 top-2 w-max rounded-xl',
         )}
-        style={
-          pos.mobile
-            ? undefined
-            : {
-                ...(pos.left !== null ? { left: pos.left } : { right: pos.right ?? 8 }),
-                ...(pos.up ? { bottom: pos.bottom } : { top: pos.top }),
-                maxWidth: 'calc(100vw - 16px)',
-              }
-        }
       >
-        {pos.mobile && (
+        {layout.mobile && (
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
             <span className="text-base font-semibold text-foreground">{title}</span>
             <button
@@ -298,12 +326,12 @@ export function DateRangePicker({
             </button>
           </div>
         )}
-        <div className={cn('flex', pos.mobile ? 'flex-col' : 'flex-row')}>
+        <div className={cn('flex', layout.mobile ? 'flex-col' : 'flex-row')}>
           {/* preset cepat */}
           {presets.length > 0 && (
             <div
               className={cn(
-                pos.mobile
+                layout.mobile
                   ? 'flex gap-1.5 overflow-x-auto border-b border-border px-4 py-2.5'
                   : 'flex w-32 flex-shrink-0 flex-col gap-1 border-r border-border bg-muted/30 p-2',
               )}
@@ -316,7 +344,7 @@ export function DateRangePicker({
                   className={cn(
                     'whitespace-nowrap rounded-lg px-3 py-1.5 text-left text-sm font-medium transition-colors',
                     activePreset === k ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-                    pos.mobile && activePreset !== k && 'bg-muted',
+                    layout.mobile && activePreset !== k && 'bg-muted',
                   )}
                 >
                   {l}

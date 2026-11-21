@@ -148,8 +148,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="hidden h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-8 md:flex">
           <h1 className="text-lg font-bold text-foreground">{current.label}</h1>
           <div className="flex items-center gap-3">
-            <UpdateStatus />
-            <RefreshButton withLabel />
+            {/* layar sedang (tablet / HP lipat dibuka): versi ringkas supaya header tidak terpotong */}
+            <span className="hidden xl:inline-flex">
+              <UpdateStatus />
+            </span>
+            <span className="inline-flex xl:hidden">
+              <UpdateStatus compact />
+            </span>
+            <span className="hidden xl:inline-flex">
+              <RefreshButton withLabel />
+            </span>
+            <span className="inline-flex xl:hidden">
+              <RefreshButton />
+            </span>
             <ThemeToggle className="grid h-9 w-9 place-items-center rounded-full text-lg leading-none text-foreground transition-colors hover:bg-muted" />
             <div className="relative">
               <button
@@ -157,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="flex items-center gap-2 rounded-full border border-border/60 py-1 pl-1 pr-2 transition-colors hover:bg-muted"
               >
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-sm font-bold text-primary">{initialsOf(email)}</span>
-                <span className="max-w-40 truncate text-sm font-medium text-foreground">{email ?? 'Akun'}</span>
+                <span className="hidden max-w-40 truncate text-sm font-medium text-foreground xl:inline">{email ?? 'Akun'}</span>
                 <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', userMenu && 'rotate-180')} />
               </button>
               {userMenu && (
