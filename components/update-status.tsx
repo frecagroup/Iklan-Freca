@@ -11,16 +11,17 @@ function isOk(status: string | null | undefined) {
 }
 
 export function UpdateStatus({ compact = false }: { compact?: boolean }) {
-  const { sync } = useDashboard()
+  const { sync, lastFetched, today } = useDashboard()
   if (!sync?.last_run) {
     return <span className="text-xs text-muted-foreground">{compact ? '—' : 'Update terakhir: —'}</span>
   }
   const d = new Date(sync.last_run)
   const day = todayWIB(d)
-  const sameDay = day === todayWIB()
+  const sameDay = day === today
   const label = `${sameDay ? '' : `${tanggal(day, false)} `}${jamWIB(d)} WIB`
   const ok = isOk(sync.status)
-  const stale = Date.now() - d.getTime() > 45 * 60 * 1000 // > 3x jadwal 15 menit
+  // > 3x jadwal 15 menit, diukur saat status terakhir diambil
+  const stale = lastFetched !== null && lastFetched.getTime() - d.getTime() > 45 * 60 * 1000
 
   return (
     <span

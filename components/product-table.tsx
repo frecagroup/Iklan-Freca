@@ -1,17 +1,18 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import { WarnBadge } from './metrics-view'
 import { decimal, integer, percent, rupiah } from '@/lib/format'
 import { isWarning, NPM_THRESHOLD, warningReason, type ProductTotals, type Totals } from '@/lib/metrics'
 import { cn } from '@/lib/cn'
 
-type Key = 'product' | 'gmv' | 'spend' | 'cpr' | 'roas' | 'profit' | 'poas' | 'npm'
+type Key = 'product' | 'gmv' | 'orders' | 'spend' | 'cpr' | 'roas' | 'profit' | 'poas' | 'npm'
 
 const COLS: Array<{ key: Key; label: string; num: boolean }> = [
   { key: 'product', label: 'Produk', num: false },
   { key: 'gmv', label: 'GMV', num: true },
+  { key: 'orders', label: 'Pesanan', num: true },
   { key: 'spend', label: 'Spend Iklan', num: true },
   { key: 'cpr', label: 'CPR', num: true },
   { key: 'roas', label: 'ROAS', num: true },
@@ -24,6 +25,8 @@ function cell(key: Exclude<Key, 'product'>, t: Totals): string {
   switch (key) {
     case 'gmv':
       return rupiah(t.gmv)
+    case 'orders':
+      return integer(t.orders)
     case 'spend':
       return rupiah(t.spend)
     case 'cpr':
@@ -39,6 +42,16 @@ function cell(key: Exclude<Key, 'product'>, t: Totals): string {
   }
 }
 
+/** ⚠ profit belum lengkap (ada baris tanpa HPP) */
+function Incomplete({ n }: { n?: number }) {
+  if (!n || n <= 0) return null
+  return (
+    <span title={`Profit belum lengkap: ${n} baris tanpa HPP`} className="mr-1 inline-flex align-[-2px] text-warning">
+      <AlertTriangle className="h-3.5 w-3.5" />
+    </span>
+  )
+}
+
 function tone(key: Key, t: Totals): string {
   if (key === 'profit' && t.profit < 0) return 'text-destructive'
   if (key === 'poas' && t.poas !== null && t.poas < 0) return 'text-destructive'
@@ -46,7 +59,9 @@ function tone(key: Key, t: Totals): string {
   return ''
 }
 
-export function ProductTable({ items, summary }: { items: ProductTotals[]; summary: Totals }) {
+type Item = ProductTotals & { profitIncomplete?: number }
+
+export function ProductTable({ items, summary }: { items: Item[]; summary: Totals & { profitIncomplete?: number } }) {
   const [sort, setSort] = useState<{ key: Key; dir: 'asc' | 'desc' }>({ key: 'gmv', dir: 'desc' })
 
   const sorted = useMemo(() => {
@@ -71,7 +86,7 @@ export function ProductTable({ items, summary }: { items: ProductTotals[]; summa
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[760px] border-collapse text-sm">
+        <table className="w-full min-w-[840px] border-collapse text-sm">
           <thead>
             <tr className="border-b border-border bg-muted/60">
               {COLS.map((c) => {
@@ -109,7 +124,7 @@ export function ProductTable({ items, summary }: { items: ProductTotals[]; summa
             {sorted.map((p) => {
               const warn = p.spend + p.gmv > 0 && isWarning(p)
               return (
-                <tr key={p.product} className={cn('border-b border-border/70 last:border-0', warn && 'bg-destructive/5')}>
+                <tr key={`${p.brand}|${p.product}`} className={cn('border-b border-border/70 last:border-0', warn && 'bg-destructive/5')}>
                   <td
                     className="sticky-col max-w-[180px] bg-card px-3 py-2.5 align-top sm:max-w-[260px]"
                     style={warn ? { background: 'color-mix(in srgb, var(--color-destructive) 5%, var(--color-card))' } : undefined}
@@ -117,15 +132,15 @@ export function ProductTable({ items, summary }: { items: ProductTotals[]; summa
                     <p className="truncate font-medium text-foreground" title={p.product}>
                       {p.product}
                     </p>
-                    <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
-                      <span className="text-[11px] text-muted-foreground">{integer(p.orders)} order</span>
-                      {warn && (
+                    {warn && (
+                      <div className="mt-0.5">
                         <WarnBadge size="sm">{warningReason(p)}</WarnBadge>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </td>
                   {COLS.slice(1).map((c) => (
                     <td key={c.key} className={cn('whitespace-nowrap px-3 py-2.5 text-right tabular-nums', tone(c.key, p))}>
+                      {c.key === 'profit' && <Incomplete n={p.profitIncomplete} />}
                       {cell(c.key as Exclude<Key, 'product'>, p)}
                     </td>
                   ))}
@@ -138,10 +153,10 @@ export function ProductTable({ items, summary }: { items: ProductTotals[]; summa
               <tr className="border-t-2 border-border bg-muted/60 font-bold">
                 <td className="sticky-col bg-muted px-3 py-3 text-foreground">
                   Summary
-                  <span className="ml-1 text-[11px] font-medium text-muted-foreground">· {integer(summary.orders)} order</span>
                 </td>
                 {COLS.slice(1).map((c) => (
                   <td key={c.key} className={cn('whitespace-nowrap px-3 py-3 text-right tabular-nums text-foreground', tone(c.key, summary))}>
+                    {c.key === 'profit' && <Incomplete n={summary.profitIncomplete} />}
                     {cell(c.key as Exclude<Key, 'product'>, summary)}
                   </td>
                 ))}

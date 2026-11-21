@@ -101,13 +101,13 @@ function Legend() {
   )
 }
 
-export function MoneyChart({ data }: { data: DayPoint[] }) {
+export function MoneyChart({ data, periodLabel = '30 hari terakhir' }: { data: DayPoint[]; periodLabel?: string }) {
   return (
     <Card className="p-4 md:p-5">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h3 className="text-sm font-bold text-foreground">GMV, Spend & Profit harian</h3>
-          <p className="text-xs text-muted-foreground">30 hari terakhir · profit = estimasi · titik bulat = hari ini (berjalan)</p>
+          <p className="text-xs text-muted-foreground">{periodLabel} · profit = estimasi · titik bulat = hari ini (berjalan)</p>
         </div>
         <Legend />
       </div>

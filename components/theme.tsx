@@ -1,35 +1,38 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 
 type Theme = 'light' | 'dark'
-const ThemeCtx = createContext<{ theme: Theme; toggle: () => void }>({ theme: 'light', toggle: () => {} })
 
 /** Dijalankan di <head> sebelum render supaya tidak berkedip saat mode gelap. */
 export const themeInitScript = `(function(){try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark'){t=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}if(t==='dark')document.documentElement.classList.add('dark')}catch(e){}})();`
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('light')
+// Sumber kebenaran tema = class "dark" di <html>
+function subscribe(cb: () => void) {
+  const obs = new MutationObserver(cb)
+  obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  return () => obs.disconnect()
+}
+const getTheme = (): Theme => (document.documentElement.classList.contains('dark') ? 'dark' : 'light')
+const getServerTheme = (): Theme => 'light'
 
-  useEffect(() => {
-    setTheme(document.documentElement.classList.contains('dark') ? 'dark' : 'light')
-  }, [])
-
-  const toggle = () => {
-    const next: Theme = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-    try {
-      localStorage.setItem('theme', next)
-    } catch {
-      /* abaikan */
-    }
+function setTheme(next: Theme) {
+  document.documentElement.classList.toggle('dark', next === 'dark')
+  try {
+    localStorage.setItem('theme', next)
+  } catch {
+    /* abaikan */
   }
-
-  return <ThemeCtx.Provider value={{ theme, toggle }}>{children}</ThemeCtx.Provider>
 }
 
-export const useTheme = () => useContext(ThemeCtx)
+export function ThemeProvider({ children }: { children: ReactNode }) {
+  return <>{children}</>
+}
+
+export function useTheme() {
+  const theme = useSyncExternalStore(subscribe, getTheme, getServerTheme)
+  return { theme, toggle: () => setTheme(theme === 'dark' ? 'light' : 'dark') }
+}
 
 export function ThemeToggle({ className = '' }: { className?: string }) {
   const { theme, toggle } = useTheme()

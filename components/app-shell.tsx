@@ -4,47 +4,35 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { LayoutDashboard, Store, TrendingUp, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { LayoutDashboard, Store, TrendingUp, LogOut, ChevronLeft, ChevronRight, ChevronDown, GitCompare, Settings } from 'lucide-react'
 import { getSupabase } from '@/lib/supabase/client'
 import { BRANDS, brandSlug } from '@/lib/metrics'
 import { ThemeToggle } from './theme'
 import { UpdateStatus, RefreshButton } from './update-status'
 import { cn } from '@/lib/cn'
+import { useDashboard } from '@/lib/data'
 
+// short = label di tab bawah HP
 const nav = [
-  { href: '/', label: 'Ringkasan', icon: LayoutDashboard, match: (p: string) => p === '/' },
-  { href: `/brand/${brandSlug(BRANDS[0])}`, label: 'Detail Brand', icon: Store, match: (p: string) => p.startsWith('/brand') },
-  { href: '/tren', label: 'Tren', icon: TrendingUp, match: (p: string) => p.startsWith('/tren') },
+  { href: '/', label: 'Ringkasan', short: 'Ringkasan', icon: LayoutDashboard, match: (p: string) => p === '/' },
+  { href: `/brand/${brandSlug(BRANDS[0])}`, label: 'Detail Brand', short: 'Brand', icon: Store, match: (p: string) => p.startsWith('/brand') },
+  { href: '/tren', label: 'Tren', short: 'Tren', icon: TrendingUp, match: (p: string) => p.startsWith('/tren') },
+  { href: '/komparasi', label: 'Komparasi', short: 'Banding', icon: GitCompare, match: (p: string) => p.startsWith('/komparasi') },
+  // editorOnly: hanya tampil bila ads.is_settings_editor() = true
+  { href: '/pengaturan', label: 'Pengaturan', short: 'Setting', icon: Settings, match: (p: string) => p.startsWith('/pengaturan'), editorOnly: true },
 ]
+type NavItem = (typeof nav)[number] & { editorOnly?: boolean }
+
+/** Menu yang boleh dilihat. Selama status editor belum diketahui (null), menu editor disembunyikan supaya tidak berkedip. */
+const visibleNav = (isEditor: boolean | null): NavItem[] => (nav as NavItem[]).filter((n) => !n.editorOnly || isEditor === true)
 
 function initialsOf(email?: string | null): string {
   if (!email) return 'F'
   return email.slice(0, 2).toUpperCase()
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const [collapsed, setCollapsed] = useState(false)
-  const [userMenu, setUserMenu] = useState(false)
-  const [email, setEmail] = useState<string | null>(null)
-
-  useEffect(() => {
-    getSupabase()
-      .auth.getUser()
-      .then(({ data }) => setEmail(data.user?.email ?? null))
-  }, [])
-
-  const out = async () => {
-    setUserMenu(false)
-    await getSupabase().auth.signOut()
-    router.replace('/login')
-    router.refresh()
-  }
-
-  const current = nav.find((n) => n.match(pathname)) ?? nav[0]
-
-  const Sidebar = ({ mini = false }: { mini?: boolean }) => (
+function Sidebar({ mini = false, pathname, items }: { mini?: boolean; pathname: string; items: NavItem[] }) {
+  return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
       <div className={cn('flex h-20 flex-shrink-0 items-center border-b border-sidebar-border', mini ? 'justify-center px-2' : 'gap-3 px-5')}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -58,7 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-4">
-        {nav.map((n) => {
+        {items.map((n) => {
           const Icon = n.icon
           const active = n.match(pathname)
           return (
@@ -106,11 +94,36 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
     </div>
   )
+}
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const [collapsed, setCollapsed] = useState(false)
+  const [userMenu, setUserMenu] = useState(false)
+  const [email, setEmail] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSupabase()
+      .auth.getUser()
+      .then(({ data }) => setEmail(data.user?.email ?? null))
+  }, [])
+
+  const out = async () => {
+    setUserMenu(false)
+    await getSupabase().auth.signOut()
+    router.replace('/login')
+    router.refresh()
+  }
+
+  const { isEditor } = useDashboard()
+  const items = visibleNav(isEditor)
+  const current = nav.find((n) => n.match(pathname)) ?? nav[0]
 
   return (
     <div className="flex h-dvh overflow-hidden bg-muted/40">
       <aside className={cn('relative hidden flex-shrink-0 transition-all duration-300 md:block', collapsed ? 'w-20' : 'w-64')}>
-        <Sidebar mini={collapsed} />
+        <Sidebar mini={collapsed} pathname={pathname} items={items} />
         <button
           onClick={() => setCollapsed((c) => !c)}
           aria-label={collapsed ? 'Lebarkan menu' : 'Ciutkan menu'}
@@ -143,8 +156,19 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="hidden h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-8 md:flex">
           <h1 className="text-lg font-bold text-foreground">{current.label}</h1>
           <div className="flex items-center gap-3">
-            <UpdateStatus />
-            <RefreshButton withLabel />
+            {/* layar sedang (tablet / HP lipat dibuka): versi ringkas supaya header tidak terpotong */}
+            <span className="hidden xl:inline-flex">
+              <UpdateStatus />
+            </span>
+            <span className="inline-flex xl:hidden">
+              <UpdateStatus compact />
+            </span>
+            <span className="hidden xl:inline-flex">
+              <RefreshButton withLabel />
+            </span>
+            <span className="inline-flex xl:hidden">
+              <RefreshButton />
+            </span>
             <ThemeToggle className="grid h-9 w-9 place-items-center rounded-full text-lg leading-none text-foreground transition-colors hover:bg-muted" />
             <div className="relative">
               <button
@@ -152,7 +176,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="flex items-center gap-2 rounded-full border border-border/60 py-1 pl-1 pr-2 transition-colors hover:bg-muted"
               >
                 <span className="grid h-8 w-8 place-items-center rounded-full bg-primary/15 text-sm font-bold text-primary">{initialsOf(email)}</span>
-                <span className="max-w-40 truncate text-sm font-medium text-foreground">{email ?? 'Akun'}</span>
+                <span className="hidden max-w-40 truncate text-sm font-medium text-foreground xl:inline">{email ?? 'Akun'}</span>
                 <ChevronDown className={cn('h-4 w-4 text-muted-foreground transition-transform', userMenu && 'rotate-180')} />
               </button>
               {userMenu && (
@@ -180,7 +204,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         {/* Tab bawah HP (gaya UserLayout Absensi) */}
         <nav className="fixed inset-x-0 bottom-0 z-30 flex gap-1 border-t border-border bg-card/95 px-2 pt-2 pb-[calc(0.5rem_+_env(safe-area-inset-bottom))] backdrop-blur md:hidden">
-          {nav.map((n) => {
+          {items.map((n) => {
             const Icon = n.icon
             const active = n.match(pathname)
             return (
@@ -188,12 +212,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 key={n.href}
                 href={n.href}
                 className={cn(
-                  'flex flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-xs font-medium transition-colors',
+                  'flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-xl py-1.5 text-[11px] font-medium transition-colors',
                   active ? 'bg-primary/12 text-primary' : 'text-muted-foreground hover:text-foreground',
                 )}
               >
                 <Icon className="h-5 w-5" />
-                {n.label === 'Detail Brand' ? 'Brand' : n.label}
+                {n.short}
               </Link>
             )
           })}

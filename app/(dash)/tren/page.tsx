@@ -5,19 +5,19 @@ import { BrandTabs } from '@/components/brand-tabs'
 import { DailyTable, MoneyChart, NpmChart, type DayPoint } from '@/components/trend-charts'
 import { ErrorBox, ProfitNote } from '@/components/metrics-view'
 import { useAdsRows, useDashboard } from '@/lib/data'
-import { addDays, eachDay, tanggal, todayWIB } from '@/lib/format'
+import { DateRangePicker, presetRange, type DateRange, type RangePresetKey } from '@/components/date-range-picker'
+import { addDays, dayCount, eachDay, rangeLabelFull, tanggal } from '@/lib/format'
 import { sumRows, type AdsRow, type Brand } from '@/lib/metrics'
 
 export default function TrenPage() {
-  const { tick } = useDashboard()
+  const { today } = useDashboard()
   const [brand, setBrand] = useState<Brand | null>(null)
-
-  // 30 hari terakhir (WIB), termasuk hari ini yang masih berjalan
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const range = useMemo(() => {
-    const t = todayWIB()
-    return { from: addDays(t, -29), to: t }
-  }, [tick])
+  // default 30 hari terakhir (WIB); preset relatif ikut bergeser bila lewat tengah malam
+  const [pick, setPick] = useState<{ preset: RangePresetKey | null; range: DateRange }>({
+    preset: '30',
+    range: { from: addDays(today, -29), to: today },
+  })
+  const range = useMemo(() => (pick.preset ? presetRange(pick.preset, today) : pick.range), [pick, today])
   const { rows, error } = useAdsRows(range, brand)
 
   const series = useMemo<DayPoint[] | null>(() => {
@@ -39,21 +39,31 @@ export default function TrenPage() {
         npm: t.npm,
         roas: t.roas,
         orders: t.orders,
-        partial: d === range.to,
+        partial: d === today, // hari ini masih berjalan
       }
     })
-  }, [rows, range])
+  }, [rows, range, today])
 
   return (
     <div className="space-y-4">
-      <BrandTabs active={brand} onSelect={(b) => setBrand(b as Brand | null)} withAll />
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <BrandTabs active={brand} onSelect={(b) => setBrand(b as Brand | null)} withAll />
+        <DateRangePicker
+          value={range}
+          max={today}
+          className="sm:ml-auto"
+          buttonClassName="py-2"
+          title="Periode grafik"
+          onChange={(r, key) => setPick({ preset: key ?? null, range: r })}
+        />
+      </div>
       <p className="text-xs text-muted-foreground">
-        {tanggal(range.from)} – {tanggal(range.to)} · {brand ?? 'Semua brand'}
+        {rangeLabelFull(range.from, range.to)} · {dayCount(range.from, range.to)} hari · {brand ?? 'Semua brand'}
       </p>
       {error && <ErrorBox message={error} />}
       {series ? (
         <>
-          <MoneyChart data={series} />
+          <MoneyChart data={series} periodLabel={`${dayCount(range.from, range.to)} hari`} />
           <NpmChart data={series} />
           <DailyTable data={series} />
         </>
