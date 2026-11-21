@@ -11,9 +11,9 @@ import { CompareSummaryCards } from '@/components/compare/summary-cards'
 import { CompareTable } from '@/components/compare/compare-table'
 import { useDashboard, useQuery, type Range } from '@/lib/data'
 import { addDays, dayCount, rangeLabel } from '@/lib/format'
+import { DateRangePicker } from '@/components/date-range-picker'
 import { BRANDS } from '@/lib/metrics'
 import { fetchCompare, fetchPeriodSummary, splitSummary, type CompareArgs } from '@/lib/compare'
-import { cn } from '@/lib/cn'
 
 type Mode = 'periode' | 'toko'
 type Level = 'product' | 'brand'
@@ -63,66 +63,15 @@ function RangePicker({
   today: string
   extra?: React.ReactNode
 }) {
-  const presets: Array<[string, Range]> = [
-    ['Hari ini', { from: today, to: today }],
-    ['Kemarin', { from: addDays(today, -1), to: addDays(today, -1) }],
-    ['7 Hari', { from: addDays(today, -6), to: today }],
-    ['30 Hari', { from: addDays(today, -29), to: today }],
-  ]
-  const active = presets.find(([, r]) => r.from === value.from && r.to === value.to)?.[0] ?? 'Custom'
-  const set = (r: Range) => onChange(r.from <= r.to ? r : { from: r.to, to: r.from })
   return (
     <div className="min-w-0">
       <div className="mb-1.5 flex items-baseline justify-between gap-2">
         <span className="text-sm font-medium text-foreground">{label}</span>
-        <span className="text-xs text-muted-foreground">
-          {rangeLabel(value.from, value.to)} · {dayCount(value.from, value.to)} hari
-        </span>
+        <span className="text-xs text-muted-foreground">{dayCount(value.from, value.to)} hari</span>
       </div>
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {presets.map(([l, r]) => (
-          <button
-            key={l}
-            onClick={() => set(r)}
-            className={cn(
-              'rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
-              active === l ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/70',
-            )}
-          >
-            {l}
-          </button>
-        ))}
-        <span
-          className={cn(
-            'rounded-lg px-2.5 py-1 text-xs font-medium',
-            active === 'Custom' ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground',
-          )}
-        >
-          Custom
-        </span>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <DateRangePicker value={value} onChange={(r) => onChange(r)} max={today} className="min-w-0 flex-1" buttonClassName="py-2" title={label} />
         {extra}
-      </div>
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <label className="block flex-1">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Dari</span>
-          <input
-            type="date"
-            value={value.from}
-            max={today}
-            onChange={(e) => e.target.value && set({ from: e.target.value, to: value.to })}
-            className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/40"
-          />
-        </label>
-        <label className="block flex-1">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Sampai</span>
-          <input
-            type="date"
-            value={value.to}
-            max={today}
-            onChange={(e) => e.target.value && set({ from: value.from, to: e.target.value })}
-            className="w-full rounded-lg border border-input bg-background px-2.5 py-1.5 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-ring/40"
-          />
-        </label>
       </div>
     </div>
   )
@@ -243,7 +192,7 @@ function KomparasiInner() {
                         const len = dayCount(pB.from, pB.to)
                         update({ a: rangeParam({ from: addDays(pB.from, -len), to: addDays(pB.from, -1) }) })
                       }}
-                      className="inline-flex items-center gap-1 rounded-lg bg-muted px-2.5 py-1 text-xs font-medium text-primary hover:bg-muted/70"
+                      className="inline-flex items-center justify-center gap-1 whitespace-nowrap rounded-lg bg-muted px-3 py-2 text-xs font-medium text-primary hover:bg-muted/70"
                       title="Periode dengan panjang sama tepat sebelum Periode B"
                     >
                       <History className="h-3 w-3" /> Sebelum B

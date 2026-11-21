@@ -10,7 +10,7 @@ Data di Supabase diisi otomatis oleh VPS setiap 15 menit. Web ini **hanya membac
 
 | Halaman | Isi |
 |---|---|
-| **Ringkasan** (`/`) | Pilih periode (Hari ini berjalan, Kemarin, 7 hari, 30 hari, Custom). Kartu Grand Total: GMV, Spend, ROAS, Profit, POAS, NPM, Order, CPR. Daftar produk "Perlu dicek". Satu kartu per brand. |
+| **Ringkasan** (`/`) | Pilih periode (Hari ini berjalan, Kemarin, 7 hari, 30 hari, atau kalender rentang). Kartu Grand Total: GMV, Spend, ROAS, Profit, POAS, NPM, Order, CPR. Daftar produk "Perlu dicek". Satu kartu per brand. |
 | **Detail Brand** (`/brand/ghazal`, `/brand/sultan-kasturi`, `/brand/freca`, `/brand/momea`) | Tabel per produk: Produk, GMV, Pesanan, Spend Iklan, CPR, ROAS, Profit, POAS, NPM + baris **Summary** tebal. Klik judul kolom untuk mengurutkan. |
 | **Tren** (`/tren`) | Grafik garis harian 30 hari (GMV, Spend, Profit) dan grafik NPM, per brand atau semua, plus tabel harian. |
 | **Komparasi** (`/komparasi`, tab HP "Banding") | **Toko vs Toko** (satu periode, dua toko) atau **Periode vs Periode** (satu toko, dua periode), level **Per produk** / **Per toko**. Kartu ringkasan A vs B + perubahan (hijau membaik, merah memburuk; Spend & CPR naik = memburuk), tabel A \| B \| Δ \| % per metrik (desktop) / kartu accordion (HP), baris Summary. Toko vs Toko per produk juga menampilkan tabel produk tiap toko berdampingan. Pilihan tersimpan di URL (`?mode=periode&brand=Ghazal&a=2026-11-12_2026-11-13&b=2026-11-15_2026-11-16&level=product`) sehingga bisa dibagikan. Data dari RPC `ads.compare` & `ads.period_summary`. |
@@ -20,6 +20,7 @@ Data di Supabase diisi otomatis oleh VPS setiap 15 menit. Web ini **hanya membac
 - "Update terakhir: HH:MM WIB" dari tabel `sync_status`; titik hijau berubah merah bila status bukan `ok` atau data lebih dari 45 menit tidak diperbarui.
 - Auto-refresh tiap 5 menit + tombol Refresh (juga refresh saat aplikasi dibuka lagi dari background).
 - Format Rupiah Indonesia (`Rp1.234.567`, desimal pakai koma), semua tanggal di zona **Asia/Jakarta**.
+- Pemilih tanggal: satu kalender rentang dalam satu popup — klik tanggal awal lalu tanggal akhir (klik tanggal yang sama dua kali = 1 hari), preset cepat Hari ini / Kemarin / 7 hari / 30 hari / Bulan ini, tanggal setelah hari ini (WIB) tidak bisa dipilih. Desktop 2 bulan, HP 1 bulan (bottom sheet).
 - Mode gelap (tombol 🌙), sama seperti Absensi.
 
 ### Versi HPP & pajak
@@ -108,6 +109,7 @@ app/
   login/                   # Halaman login
   globals.css              # token warna & tema dari web Absensi
 components/                # UI (ui.tsx & toast.tsx disalin dari Absensi), tabel, grafik, filter periode
+  date-range-picker.tsx    # kalender rentang satu popup (dipakai Ringkasan, Detail Brand, Tren, Komparasi)
   form.tsx                 # input Rupiah/persen/tanggal, drawer, tab pill
   compare/                 # kartu ringkasan & tabel komparasi
   settings/                # tab HPP (edit, riwayat, import) & tab Pajak

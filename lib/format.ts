@@ -108,3 +108,13 @@ export function dayCount(from: string, to: string): number {
   }
   return Math.round((ms(to) - ms(from)) / 86_400_000) + 1
 }
+
+/** Label rentang lengkap dengan tahun: "1–20 Nov 2026", "1 Nov 2026", "28 Okt – 3 Nov 2026", "28 Des 2025 – 3 Jan 2026" */
+export function rangeLabelFull(from: string, to: string): string {
+  const [y1, m1, d1] = from.split('-').map(Number)
+  const [y2, m2, d2] = to.split('-').map(Number)
+  if (from === to) return `${d1} ${BULAN[m1 - 1]} ${y1}`
+  if (y1 === y2 && m1 === m2) return `${d1}–${d2} ${BULAN[m1 - 1]} ${y1}`
+  if (y1 === y2) return `${d1} ${BULAN[m1 - 1]} – ${d2} ${BULAN[m2 - 1]} ${y1}`
+  return `${d1} ${BULAN[m1 - 1]} ${y1} – ${d2} ${BULAN[m2 - 1]} ${y2}`
+}
