@@ -32,10 +32,10 @@ import { cn } from '@/lib/cn'
 /** Video Learning dengan pesanan < ini: CPR tinggi diberi warna lembut, bukan alarm */
 const LEARNING_MIN_ORDERS = 5
 
-type Col = { key: CreativeSort | null; label: string; num?: boolean }
+// Kolom judul video sengaja tidak ditampilkan (tabel lebih pendek); judul ada di tooltip ID Post.
+type Col = { key: Exclude<CreativeSort, 'title'> | null; label: string; num?: boolean }
 const COLS: Col[] = [
   { key: null, label: 'ID Post' },
-  { key: 'title', label: 'Judul video' },
   { key: null, label: 'Akun' },
   { key: null, label: 'Status' },
   { key: 'spend', label: 'Spend Iklan', num: true },
@@ -113,7 +113,9 @@ function TargetEditor({
   const toast = useToast()
   const [val, setVal] = useState<number | null>(target)
   const [saving, setSaving] = useState(false)
-  const dirty = val !== target
+  // ads.set_cpr_target hanya menerima angka > 0 (hapus target belum didukung di database)
+  const valid = val !== null && val > 0
+  const canSave = valid && val !== target
 
   if (!canEdit) {
     return (
@@ -124,11 +126,11 @@ function TargetEditor({
   }
 
   const save = async () => {
-    if (val !== null && val <= 0) return toast.show('Target CPR harus lebih dari 0', 'bad')
+    if (val === null || val <= 0) return toast.show('Target CPR harus angka lebih dari 0', 'bad')
     setSaving(true)
     try {
       await setCprTarget(brand, product, val)
-      toast.show(val === null ? 'Target CPR dihapus' : `Target CPR ${product}: ${rupiah(val)}`, 'ok')
+      toast.show(`Target CPR ${product}: ${rupiah(val)}`, 'ok')
       onSaved()
     } catch (e) {
       toast.show(errorMessage(e), 'bad')
@@ -143,9 +145,14 @@ function TargetEditor({
       <div className="w-36">
         <RupiahInput value={val} onChange={setVal} placeholder="Belum diset" />
       </div>
-      <Button size="sm" onClick={save} loading={saving} disabled={!dirty}>
+      <Button size="sm" onClick={save} loading={saving} disabled={!canSave}>
         Simpan
       </Button>
+      {!valid && val !== target && target !== null && (
+        <button type="button" onClick={() => setVal(target)} className="text-xs font-medium text-primary hover:underline">
+          Batal
+        </button>
+      )}
     </div>
   )
 }
@@ -197,7 +204,7 @@ export function CreativePanel({
 
   const changeSort = (key: CreativeSort) => {
     setPage(1)
-    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: key === 'title' ? 'asc' : 'desc' }))
+    setSort((s) => (s.key === key ? { key, dir: s.dir === 'desc' ? 'asc' : 'desc' } : { key, dir: 'desc' }))
   }
 
   const doToggle = async (r: CreativeRow) => {
@@ -262,7 +269,7 @@ export function CreativePanel({
 
       {/* ---------- tabel ---------- */}
       <div className="overflow-x-auto">
-        <table className={cn('w-full min-w-[900px] border-collapse text-xs sm:min-w-[980px]', q.loading && rows.length > 0 && 'opacity-60')}>
+        <table className={cn('w-full min-w-[640px] border-collapse text-xs sm:min-w-[780px]', q.loading && rows.length > 0 && 'opacity-60')}>
           <thead>
             <tr className="border-y border-border bg-muted/60 text-muted-foreground">
               {COLS.map((c, i) => {
@@ -338,28 +345,13 @@ export function CreativePanel({
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-primary hover:underline"
                         onClick={(e) => e.stopPropagation()}
-                        title={r.item_id}
+                        title={r.title ? `${r.item_id} — ${r.title}` : r.item_id}
                       >
                         {/* HP: 8 digit terakhir supaya kolom tidak terlalu lebar; tautan tetap ID penuh */}
                         <span className="sm:hidden">…{r.item_id.slice(-8)}</span>
                         <span className="hidden sm:inline">{r.item_id}</span>
                         <ExternalLink className="h-3 w-3" />
                       </a>
-                    )}
-                  </td>
-                  <td className="max-w-[240px] px-2.5 py-2 align-top">
-                    <p className="line-clamp-2 text-foreground" title={r.title ?? ''}>
-                      {r.title || (card ? 'Kartu produk' : '—')}
-                    </p>
-                    {hardOver && (
-                      <span className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-destructive px-1.5 py-px text-[10px] font-bold text-white">
-                        <AlertTriangle className="h-2.5 w-2.5" /> CPR di atas target
-                      </span>
-                    )}
-                    {softOver && (
-                      <span className="mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/20 px-1.5 py-px text-[10px] font-semibold text-foreground">
-                        CPR tinggi · masih uji ({r.orders} pesanan)
-                      </span>
                     )}
                   </td>
                   <td className="max-w-[140px] truncate px-2.5 py-2 align-top text-muted-foreground" title={r.tt_account_name ?? ''}>
@@ -379,6 +371,21 @@ export function CreativePanel({
                     )}
                   >
                     {rupiah(r.cpr)}
+                    {/* badge peringatan CPR (dulu di sel judul) */}
+                    {hardOver && (
+                      <span className="mt-1 flex justify-end">
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-destructive px-1.5 py-px text-[10px] font-bold text-white">
+                          <AlertTriangle className="h-2.5 w-2.5" /> CPR di atas target
+                        </span>
+                      </span>
+                    )}
+                    {softOver && (
+                      <span className="mt-1 flex justify-end" title={`Masih tahap uji dengan ${r.orders} pesanan`}>
+                        <span className="inline-flex items-center gap-1 whitespace-nowrap rounded-full bg-warning/20 px-1.5 py-px text-[10px] font-semibold text-foreground">
+                          CPR tinggi · masih uji
+                        </span>
+                      </span>
+                    )}
                   </td>
                   <td className="whitespace-nowrap px-2.5 py-2 text-right align-top tabular-nums">{decimal(r.roas)}</td>
                   <td className="whitespace-nowrap px-1 py-0.5 text-center align-top">

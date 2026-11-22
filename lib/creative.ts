@@ -87,6 +87,7 @@ export function statusLabel(r: Pick<CreativeRow, 'item_id' | 'shop_content_type'
       return { label: 'Antrian', tone: 'neutral' }
     case 'NOT_DELIVERING':
     case 'NOT_DELIVERY':
+    case 'NOT_DELIVERYING': // ejaan resmi TikTok API
       return { label: 'Tidak jalan', tone: 'neutral' }
     case 'AUTHORIZATION_NEEDED':
     case 'UNAUTHORIZED':
@@ -187,7 +188,9 @@ export async function fetchCprTargets(brand: string): Promise<Record<string, num
 
 // ---------- tulis ----------
 
-export async function setCprTarget(brand: string, product: string, target: number | null) {
+/** target wajib > 0 (database menolak null / ≤ 0) */
+export async function setCprTarget(brand: string, product: string, target: number) {
+  if (!(target > 0)) throw new Error('Target CPR harus angka lebih dari 0')
   const { data, error } = await getSupabase()
     .schema('ads')
     .rpc('set_cpr_target', { p_brand: brand, p_product: product, p_target_cpr: target })

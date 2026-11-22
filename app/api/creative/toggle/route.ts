@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
     p_advertiser_id: campaign.advertiser_id,
     p_campaign_id: campaign.campaign_id,
     p_result_status: resultStatus,
-    p_tiktok_code: tt.code,
+    p_tiktok_code: tt.code == null ? null : String(tt.code), // kolom text di DB
     p_tiktok_message: tt.message,
     p_request_id: tt.request_id,
     p_source: 'web',
