@@ -10,18 +10,57 @@ function isOk(status: string | null | undefined) {
   return /^(ok|success|sukses|done|berhasil)$/i.test(status.trim())
 }
 
-export function UpdateStatus({ compact = false }: { compact?: boolean }) {
+/** Sync VPS tiap 5 menit → dianggap terlambat bila > 3× jadwal (15 menit) */
+export const SYNC_STALE_MS = 15 * 60 * 1000
+
+/** "HH:MM WIB", diawali tanggal bila bukan hari ini */
+export function updateTimeLabel(ts: string | Date, today: string): string {
+  const d = typeof ts === 'string' ? new Date(ts) : ts
+  const day = todayWIB(d)
+  return `${day === today ? '' : `${tanggal(day, false)} `}${jamWIB(d)} WIB`
+}
+
+/** Kesehatan sync VPS dari sync_status (dipakai header & halaman brand) */
+export function useSyncHealth() {
   const { sync, lastFetched, today } = useDashboard()
-  if (!sync?.last_run) {
+  if (!sync?.last_run) return { label: null as string | null, ok: true, stale: false, healthy: true, sync }
+  const d = new Date(sync.last_run)
+  const ok = isOk(sync.status)
+  // diukur saat status terakhir diambil (bukan jam render) supaya tetap murni
+  const stale = lastFetched !== null && lastFetched.getTime() - d.getTime() > SYNC_STALE_MS
+  return { label: updateTimeLabel(d, today), ok, stale, healthy: ok && !stale, sync }
+}
+
+/** Label "Terakhir update: HH:MM WIB"; merah bila sync tidak sehat */
+export function LastUpdate({
+  ts,
+  danger = false,
+  title,
+  className,
+}: {
+  ts: string | null
+  danger?: boolean
+  title?: string
+  className?: string
+}) {
+  const { today } = useDashboard()
+  return (
+    <span
+      className={cn('inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium', danger ? 'text-destructive' : 'text-muted-foreground', className)}
+      title={title}
+    >
+      <span className={cn('h-2 w-2 rounded-full', danger ? 'bg-destructive' : 'bg-success')} />
+      Terakhir update: {ts ? updateTimeLabel(ts, today) : '—'}
+    </span>
+  )
+}
+
+export function UpdateStatus({ compact = false }: { compact?: boolean }) {
+  const { sync, label: timeLabel, ok, stale } = useSyncHealth()
+  if (!sync?.last_run || !timeLabel) {
     return <span className="text-xs text-muted-foreground">{compact ? '—' : 'Update terakhir: —'}</span>
   }
-  const d = new Date(sync.last_run)
-  const day = todayWIB(d)
-  const sameDay = day === today
-  const label = `${sameDay ? '' : `${tanggal(day, false)} `}${jamWIB(d)} WIB`
-  const ok = isOk(sync.status)
-  // > 3x jadwal 15 menit, diukur saat status terakhir diambil
-  const stale = lastFetched !== null && lastFetched.getTime() - d.getTime() > 45 * 60 * 1000
+  const label = timeLabel
 
   return (
     <span

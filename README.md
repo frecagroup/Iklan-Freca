@@ -4,24 +4,32 @@ Dashboard performa iklan Freca Group — **Next.js (App Router) + TypeScript + T
 Tampilan disamakan dengan web Absensi Freca (warna, font Inter, sidebar navy, kartu, tab bawah di HP).
 Bisa dipasang sebagai aplikasi (PWA, "Add to Home Screen") dengan nama **Freca Ads** dan ikon F merah.
 
-Data di Supabase diisi otomatis oleh VPS setiap 15 menit. Web ini **hanya membaca**.
+Data di Supabase diisi otomatis oleh VPS setiap 5 menit. Web hanya membaca, kecuali aksi editor lewat RPC `ads.*` dan on/off creative lewat API route server.
 
 ## Fitur
 
 | Halaman | Isi |
 |---|---|
 | **Ringkasan** (`/`) | Pilih periode (Hari ini berjalan, Kemarin, 7 hari, 30 hari, atau kalender rentang). Kartu Grand Total: GMV, Spend, ROAS, Profit, POAS, NPM, Order, CPR. Daftar produk "Perlu dicek". Satu kartu per brand. |
-| **Detail Brand** (`/brand/ghazal`, `/brand/sultan-kasturi`, `/brand/freca`, `/brand/momea`) | Tabel per produk: Produk, GMV, Pesanan, Spend Iklan, CPR, ROAS, Profit, POAS, NPM + baris **Summary** tebal. Klik judul kolom untuk mengurutkan. |
+| **Detail Brand** (`/brand/ghazal`, `/brand/sultan-kasturi`, `/brand/freca`, `/brand/momea`) | Tabel per produk: Produk, GMV, Pesanan, Spend Iklan, CPR, ROAS, Profit, POAS, NPM + baris **Summary** tebal. Klik judul kolom untuk mengurutkan. Klik baris produk untuk membuka **Video GMV Max** produk itu: ID Post (tautan TikTok), judul, akun, status, Spend, GMV, Pesanan, CPR, ROAS, saklar On/Off; filter Berbiaya / Aktif / Dimatikan / Semua; pagination server 5/10/20 (default 10); sorot "CPR di atas target"; **Target CPR** per produk; "Terakhir update: HH:MM WIB" di atas tabel dan di tiap panel. |
 | **Tren** (`/tren`) | Grafik garis harian 30 hari (GMV, Spend, Profit) dan grafik NPM, per brand atau semua, plus tabel harian. |
 | **Komparasi** (`/komparasi`, tab HP "Banding") | **Toko vs Toko** (satu periode, dua toko) atau **Periode vs Periode** (satu toko, dua periode), level **Per produk** / **Per toko**. Kartu ringkasan A vs B + perubahan (hijau membaik, merah memburuk; Spend & CPR naik = memburuk), tabel A \| B \| Δ \| % per metrik (desktop) / kartu accordion (HP), baris Summary. Toko vs Toko per produk juga menampilkan tabel produk tiap toko berdampingan. Pilihan tersimpan di URL (`?mode=periode&brand=Ghazal&a=2026-11-12_2026-11-13&b=2026-11-15_2026-11-16&level=product`) sehingga bisa dibagikan. Data dari RPC `ads.compare` & `ads.period_summary`. |
 | **Pengaturan** (`/pengaturan`, tab HP "Setting") | Tab **HPP**: HPP berlaku hari ini per SKU (filter brand, cari, sembunyikan nonaktif), Ubah / Tambah SKU dengan tanggal berlaku (tidak boleh mundur), riwayat versi per SKU (hapus versi terjadwal), **Export** `.xlsx` (satu sheet per section, format Master HPP Freca) / `.csv`, **Import** `.xlsx`/`.csv` dengan pratinjau HPP lama vs baru. Tab **Pajak Spend**: persen TikTok & Shopee PPN + riwayat. **Hanya untuk editor** (`ads.is_settings_editor()`): menu tidak tampil untuk user lain dan membuka `/pengaturan` langsung diarahkan ke Ringkasan. |
 
 - Badge merah untuk produk dengan **NPM < 10%** atau **profit negatif**.
-- "Update terakhir: HH:MM WIB" dari tabel `sync_status`; titik hijau berubah merah bila status bukan `ok` atau data lebih dari 45 menit tidak diperbarui.
+- "Update terakhir: HH:MM WIB" dari tabel `sync_status`; titik hijau berubah merah bila status bukan `ok` atau data lebih dari 15 menit (3× jadwal sync 5 menit) tidak diperbarui.
 - Auto-refresh tiap 5 menit + tombol Refresh (juga refresh saat aplikasi dibuka lagi dari background).
 - Format Rupiah Indonesia (`Rp1.234.567`, desimal pakai koma), semua tanggal di zona **Asia/Jakarta**.
 - Pemilih tanggal: satu kalender rentang dalam satu popup — klik tanggal awal lalu tanggal akhir (klik tanggal yang sama dua kali = 1 hari), preset cepat Hari ini / Kemarin / 7 hari / 30 hari / Bulan ini, tanggal setelah hari ini (WIB) tidak bisa dipilih. Desktop 2 bulan, HP 1 bulan (bottom sheet).
 - Mode gelap (tombol 🌙), sama seperti Absensi.
+
+### Creative GMV Max (on/off video)
+
+- Data video dari view `ads_gmv_max_creative_daily` lewat RPC `ads.creative_period_summary` (agregasi rentang tanggal + pagination di server), target dari `ads_cpr_target`, kampanye aktif dari `ads_gmv_max_campaign_current`.
+- **On** = video ikut kampanye (ADD), **Off** = dikeluarkan dari kampanye Product GMV Max yang sedang ENABLE (REMOVE). Kartu produk (`item_id = -1` / `PRODUCT_CARD`) tidak bisa di-on/off dan tidak ditautkan ke TikTok.
+- Toggle & ubah target CPR hanya untuk `ads.is_creative_editor()` (terpisah dari editor HPP). User lain melihat angka & status saja.
+- Toggle dikirim ke `POST /api/creative/toggle` (server): cek sesi → `ads.is_creative_editor()` → validasi → kampanye ENABLE dari DB → TikTok `campaign/gmv_max/creative/update` → `ads.record_creative_action` (log + preferensi On/Off, juga saat gagal). Token TikTok tidak pernah sampai ke browser.
+- Status di laporan TikTok bisa tertunda ±20 menit; baris menampilkan "Menunggu sync" sampai status & preferensi selaras.
 
 ### Versi HPP & pajak
 
@@ -46,6 +54,8 @@ Spend sudah termasuk pajak 2%. **Profit = estimasi** (fee settlement riil, cance
 - Hanya user yang sudah terdaftar yang bisa masuk — **tidak ada halaman daftar**. Matikan juga pendaftaran publik di Supabase (lihat langkah 2).
 - Frontend hanya memakai **anon key**. **Service role key jangan pernah** dimasukkan ke env Vercel / kode web — hanya dipakai di VPS.
 - RLS aktif: `SELECT` hanya untuk role `authenticated`; tidak ada policy insert/update/delete untuk web.
+- `TIKTOK_ACCESS_TOKEN` hanya env **server** (tanpa `NEXT_PUBLIC_`), dibaca di `app/api/creative/toggle/route.ts`, tidak pernah dikirim ke klien atau di-log. API route memakai anon key + cookie sesi user (bukan service role) dan menolak user tanpa sesi (401), non-editor creative (403), serta request dari origin lain.
+- On/off creative & target CPR hanya untuk email yang lolos `ads.is_creative_editor()`; ini terpisah dari editor HPP.
 - **Menu Pengaturan hanya untuk email di `ads.settings_editors`; user lain hanya bisa melihat.** Status editor diambil dari RPC `ads.is_settings_editor()` sekali per sesi (diulang saat refresh atau user berganti). User view-only tidak melihat menu Pengaturan, dan membuka `/pengaturan` langsung diarahkan ke Ringkasan; bila cek gagal, user diperlakukan sebagai bukan editor. Ringkasan, Detail Brand, Tren, dan Komparasi tetap bisa dibuka semua user yang login. Penolakan sebenarnya tetap di database: semua RPC tulis (`ads.set_hpp`, `ads.import_hpp`, `ads.set_tax`, `ads.delete_future_version`) menolak non-editor.
 
 ## Deploy
@@ -76,6 +86,7 @@ Supabase → **Authentication**:
    |---|---|
    | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
    | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Project Settings → API → `anon` `public` key |
+   | `TIKTOK_ACCESS_TOKEN` | Access token TikTok Business API — **server only** (jangan diberi `NEXT_PUBLIC_`). Dipakai on/off creative GMV Max. |
 
 4. **Deploy**. Setelah env diubah, lakukan **Redeploy** (env `NEXT_PUBLIC_*` dibaca saat build).
 
@@ -107,9 +118,11 @@ app/
   (dash)/tren/             # Grafik tren
   (dash)/komparasi/        # Komparasi toko vs toko / periode vs periode
   (dash)/pengaturan/       # Setting HPP & Pajak Spend
+  api/creative/toggle/     # POST on/off creative GMV Max (server, panggil TikTok)
   login/                   # Halaman login
   globals.css              # token warna & tema dari web Absensi
 components/                # UI (ui.tsx & toast.tsx disalin dari Absensi), tabel, grafik, filter periode
+  creative-panel.tsx       # panel Video GMV Max di Detail Brand (filter, sort, pagination, target CPR, toggle)
   date-range-picker.tsx    # kalender rentang satu popup (dipakai Ringkasan, Detail Brand, Tren, Komparasi)
   form.tsx                 # input Rupiah/persen/tanggal, drawer, tab pill
   compare/                 # kartu ringkasan & tabel komparasi
@@ -122,6 +135,8 @@ lib/
   metrics.ts               # agregasi & aturan peringatan
   format.ts                # format Rupiah / tanggal WIB
   supabase/client.ts       # browser client (anon key)
+  supabase/server.ts       # server client untuk API route (anon key + cookie sesi)
+  creative.ts              # RPC/view creative GMV Max, label status, panggil /api/creative/toggle
 proxy.ts                   # wajib login di semua halaman (Next.js 16 "proxy", pengganti middleware)
 public/
   manifest.json, sw.js     # PWA
