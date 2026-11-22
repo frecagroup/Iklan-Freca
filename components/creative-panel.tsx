@@ -340,7 +340,7 @@ export function CreativePanel({
                       <span className="text-muted-foreground">{r.item_id}</span>
                     ) : (
                       <a
-                        href={`https://www.tiktok.com/video/${encodeURIComponent(r.item_id)}`}
+                        href={`https://www.tiktok.com/@/video/${encodeURIComponent(r.item_id)}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1 text-primary hover:underline"
