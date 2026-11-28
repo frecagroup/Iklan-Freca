@@ -18,7 +18,7 @@ import {
   isLearning,
   isProductCard,
   setCprTarget,
-  statusLabel,
+  displayStatus,
   toggleCreative,
   toggleIsOn,
   waitingSync,
@@ -319,7 +319,7 @@ export function CreativePanel({
             )}
             {rows.map((r) => {
               const card = isProductCard(r)
-              const st = statusLabel(r)
+              const st = displayStatus(r)
               const on = toggleIsOn(r)
               // CPR di atas target: alarm penuh, kecuali video Uji yang pesanannya masih sedikit (warna lembut)
               const softOver = r.cpr_over_target && isLearning(r) && r.orders < LEARNING_MIN_ORDERS

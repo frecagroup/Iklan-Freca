@@ -115,10 +115,22 @@ export function toggleIsOn(r: CreativeRow): boolean {
   return !isExcluded(r)
 }
 
-/** Preferensi sudah dikirim tapi laporan TikTok/sync belum menyusul */
-export function waitingSync(r: CreativeRow): boolean {
-  if (!r.desired_state || isProductCard(r)) return false
-  return r.desired_state === 'OFF' ? !isExcluded(r) : isExcluded(r)
+/**
+ * Status yang ditampilkan: bila user sudah toggle (desired_state ada), toggle itu sudah diterima
+ * TikTok (preferensi hanya tersimpan bila TikTok code 0) — tampilkan hasilnya langsung, tanpa
+ * menunggu laporan TikTok/sync yang bisa telat. Preferensi kampanye lama dihapus otomatis oleh sync.
+ */
+export function displayStatus(r: CreativeRow): { label: string; tone: ReturnType<typeof statusLabel>['tone'] } {
+  if (!isProductCard(r)) {
+    if (r.desired_state === 'OFF') return { label: 'Mati', tone: 'destructive' }
+    if (r.desired_state === 'ON' && isExcluded(r)) return { label: 'Dinyalakan', tone: 'success' }
+  }
+  return statusLabel(r)
+}
+
+/** Dulu: label "Menunggu sync" saat laporan TikTok belum menyusul. Kini toggle dianggap langsung berlaku. */
+export function waitingSync(_r: CreativeRow): boolean {
+  return false
 }
 
 // ---------- baca ----------
